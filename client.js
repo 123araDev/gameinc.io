@@ -1,5 +1,5 @@
-
 let socket = null;
+
 
 const demoConfig = {
     levels: {
@@ -14,6 +14,12 @@ const demoConfig = {
 };
 
 
+function validateCompanyName(value) {
+    const isUnique = leaderboard.filter((c) => c.name === value.trim()).length === 0;
+    document.getElementById("startCompanyButton").disabled =
+        !isUnique || value.length <= 3 || value.length > 30;
+}
+
 /* Start */
 
 async function start() {
@@ -22,7 +28,7 @@ async function start() {
         ports: {
             default: {
                 is_tls: false,
-                host: window.location.host // Utilise le domaine local en cours
+                host: window.location.host
             }
         },
         player: {
@@ -38,13 +44,13 @@ start().catch((err) => {
 });
 
 /* Connection */
-let socket = null;
+
 function connect(lobby) {
     let port = lobby.ports.default;
     let url = `${port.is_tls ? "https" : "http"}://${port.host}`;
     console.log("Connecting to lobby", url, lobby);
     
-    // Simulation d'un socket local (aucune connexion réelle)
+    // Simulation de socket local
     socket = {
         emit: (...args) => console.log("[socket.emit]", ...args),
         on: (event, handler) => {

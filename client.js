@@ -1,21 +1,35 @@
-/* Start */
-async function start() {
-    let res = await fetch("https://matchmaker.api.rivet.gg/v1/lobbies/find", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-        },
-        body: JSON.stringify({
-            game_modes: ["default"],
-        }),
-    });
-    if (!res.ok)
-        throw "Failed to find lobby: " + res.status + " " + res.statusText;
-    let body = await res.json();
 
-    connect(body.lobby);
+const demoConfig = {
+    levels: {
+        level1: { startRank: 0, name: "Intern", color: "#00FF00" },
+        level2: { startRank: 10000, name: "Startup", color: "#0000FF" },
+    },
+    createGamePrice: 5000,
+    createLawsuitPrice: 200000,
+    employeeLimits: [2, 3, 4],
+    lawyerLimits: [1, 2, 3],
+    debtLimit: 100000,
+};
+
+
+/* Start */
+
+async function start() {
+    // Simulation de l'API Rivet (mode local)
+    const fakeLobby = {
+        ports: {
+            default: {
+                is_tls: false,
+                host: window.location.host // Utilise le domaine local en cours (utile sur GitHub Pages ou en local)
+            }
+        },
+        player: {
+            token: "fake-token"
+        }
+    };
+    connect(fakeLobby);
 }
+
 
 start().catch((err) => {
     alert("Failed to start: " + err);
@@ -27,12 +41,18 @@ function connect(lobby) {
     let port = lobby.ports.default;
     let url = `${port.is_tls ? "https" : "http"}://${port.host}`;
     console.log("Connecting to lobby", url, lobby);
-    socket = io(url, {
-        query: {
-            token: lobby.player.token,
+    
+    // Simulation d'un socket local (aucune connexion réelle)
+    socket = {
+        emit: (...args) => console.log("[socket.emit]", ...args),
+        on: (event, handler) => {
+            console.log("[socket.on]", event);
+            if (event === "connect") setTimeout(() => handler(), 100);
+            if (event === "init") setTimeout(() => handler({ config: demoConfig }), 300);
         },
-        reconnection: false,
-    });
+        close: () => console.log("[socket closed]"),
+    };
+
 
     // Options for employees to hire
     let ignoreDisconnect = false;

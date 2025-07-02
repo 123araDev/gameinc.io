@@ -1,4 +1,6 @@
 
+let socket = null;
+
 const demoConfig = {
     levels: {
         level1: { startRank: 0, name: "Intern", color: "#00FF00" },
@@ -20,7 +22,7 @@ async function start() {
         ports: {
             default: {
                 is_tls: false,
-                host: window.location.host // Utilise le domaine local en cours (utile sur GitHub Pages ou en local)
+                host: window.location.host // Utilise le domaine local en cours
             }
         },
         player: {

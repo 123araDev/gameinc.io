@@ -14,11 +14,12 @@ const demoConfig = {
 };
 
 
+
 function validateCompanyName(value) {
-    const isUnique = leaderboard.filter((c) => c.name === value.trim()).length === 0;
-    document.getElementById("startCompanyButton").disabled =
-        !isUnique || value.length <= 3 || value.length > 30;
+    const isValid = value.length > 3 && value.length <= 30;
+    document.getElementById("startCompanyButton").disabled = !isValid;
 }
+
 
 /* Start */
 
@@ -340,12 +341,12 @@ function startCompany() {
     // createCompanySound.play();
 }
 
+
 function validateCompanyName(value) {
-    const isUnique =
-        leaderboard.filter((c) => c.name === value.trim()).length === 0;
-    document.getElementById("startCompanyButton").disabled =
-        !isUnique || value.length <= 3 || value.length > 30;
+    const isValid = value.length > 3 && value.length <= 30;
+    document.getElementById("startCompanyButton").disabled = !isValid;
 }
+
 
 function createGame() {
     presentModal("createGameModal");

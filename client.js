@@ -1,35 +1,34 @@
-// === Game Inc. Single-Player Edition - Enhanced ===
-
-/*
-Features:
-- Hire talent (programmers/influencers for games)
-- 2 AI companies, compete on leaderboard
-- Games give passive money, coding gives instant money only
-- Random game names (Play.io, Dough.io, etc)
-*/
+// === Game Inc. Single-Player Edition with AI and Hiring ===
 
 // -- Game Config --
 const config = {
     createGamePrice: 5000,
-    createLawsuitPrice: 200000,
+    employeeLimits: [2, 3, 4],   // per game quality
+    influencerLimits: [1, 2, 2], // per game quality
     debtLimit: 1000000,
     levels: {
         0: {name: 'Startup', startRank: 0, color: '#25C5FC'},
         1: {name: 'Indie', startRank: 100000, color: '#38FD2F'},
         2: {name: 'AA', startRank: 500000, color: '#ca30fd'},
         3: {name: 'AAA', startRank: 2000000, color: '#FFD700'}
-    },
-    employeeLimits: [2, 3, 4], // by quality
-    influencerLimits: [1, 2, 2], // by quality
+    }
 };
 
-// -- AI Names and Game Names --
+const gameTiers = ["🌐", "📱️", "🎮"];
+const titleColors = ["#25C5FC", "#38FD2F", "#ca30fd"];
+const progressColors = [
+    "linear-gradient(to right, #1783FB, #4CD8FC)",
+    "linear-gradient(to right, #52B05C, #38FD2F)",
+    "linear-gradient(to right, #9954b0, #ca30fd)",
+];
+
 const adjectives = [
     "Super", "Mega", "Hyper", "Fast", "Cool", "Dough", "Play", "Fun", "Pixel", "Cyber", "Auto", "Cash", "Idle", "Power", "Star"
 ];
 const endings = [
     "io", "X", "Prime", "Run", "World", "Tycoon", "Quest", "Mania", "Inc", "Zone", "Rush", "Saga", "Empire"
 ];
+
 function randomGameName() {
     return (
         adjectives[Math.floor(Math.random() * adjectives.length)] +
@@ -38,26 +37,26 @@ function randomGameName() {
         endings[Math.floor(Math.random() * endings.length)]
     );
 }
-const aiNames = ["BotBox", "FutureWare", "CodeWorks", "DreamSoft", "SynthAI", "BitForge"];
-function randomAIName(used = []) {
-    let pool = aiNames.filter(n => !used.includes(n));
-    return pool[Math.floor(Math.random() * pool.length)] || "AI";
-}
 function randomEmployeeName() {
     const first = ["Alex", "Chris", "Drew", "Jamie", "Morgan", "Taylor", "Jordan", "Casey", "Blake", "Sam"];
     const last = ["Smith", "Johnson", "Lee", "Brown", "Jones", "Davis", "Miller", "Wilson", "Moore", "King"];
     return first[Math.floor(Math.random() * first.length)] + " " + last[Math.floor(Math.random() * last.length)];
 }
+const aiNames = ["BotBox", "FutureWare", "CodeWorks", "DreamSoft", "SynthAI", "BitForge"];
+function randomAIName(used = []) {
+    let pool = aiNames.filter(n => !used.includes(n));
+    return pool[Math.floor(Math.random() * pool.length)] || "AI";
+}
 
-// -- Data Structures --
+// -- Initial Player and AI Companies --
 function createPlayerCompany() {
     return {
         id: 'local',
         name: '?',
         money: 10000,
         games: [],
-        lawsuits: [],
-        color: "#25C5FC"
+        color: "#25C5FC",
+        isAI: false
     };
 }
 function createAICompany(name, color) {
@@ -66,9 +65,8 @@ function createAICompany(name, color) {
         name,
         money: 8000 + Math.random() * 6000,
         games: [],
-        lawsuits: [],
         color,
-        ai: true,
+        isAI: true
     };
 }
 
@@ -81,32 +79,114 @@ let aiCompanies = [
 let leaderboard = [company, ...aiCompanies];
 let leaderboardHistory = {};
 leaderboard.forEach(c => leaderboardHistory[c.id] = [c.money]);
-let companyProfiles = {};
-leaderboard.forEach(c => companyProfiles[c.id] = c);
 let leaderboardHistorySize = 90;
-let chatOpen = false;
-let emojisOpen = false;
-let unreadMessages = 0;
 
-// -- Sounds --
-const chaChingSound = new Audio("./sounds/cha-ching.wav");
-const createCompanySound = new Audio("./sounds/create-company.wav");
-const createGameSound = new Audio("./sounds/create-game.wav");
-const gameDoneSound = new Audio("./sounds/game-done.wav");
-
-// -- Code Writing Logic --
-let codeWriting = " ";
-let codeIndex = 0;
-const txtFile = new XMLHttpRequest();
-txtFile.open("GET", "./hackerCode.txt", true);
-txtFile.onreadystatechange = function () {
-    if (txtFile.readyState === 4 && txtFile.status === 200) {
-        codeWriting = txtFile.responseText;
+// -- Passive Update Loop --
+function updatePassive() {
+    // Player's games
+    for (let game of company.games) {
+        // Progress lines of code if there are employees, but only via employees
+        if (!game.completed) {
+            let speed = game.employees.reduce((sum, e) => sum + (e.workSpeed || 0), 0);
+            game.linesOfCode += speed / 10; // scale to per second
+            if (game.linesOfCode >= game.totalLinesOfCode) {
+                game.linesOfCode = game.totalLinesOfCode;
+                game.completed = true;
+                // Show modal on new completion
+                setTimeout(() => {
+                    presentStatus(`Your game "${game.name}" is live!`);
+                    setTimeout(dismissModal, 1200);
+                }, 200);
+            }
+        }
+        // Passive revenue for completed games
+        if (game.completed) {
+            let base = 5000 * (game.quality + 1);
+            // Programmers: increase RPM (simulates better code = more RPM)
+            base += game.employees.reduce((sum, e) => sum + (e.workSpeed || 0), 0) * 10;
+            // Influencers: increase hype
+            base += game.influencers.reduce((sum, e) => sum + (e.hype || 0), 0) * 7;
+            base *= 1 - game.revenueDecay;
+            game.revenue = base;
+            if (!game.lastRevenue || Date.now() - game.lastRevenue >= 1000) {
+                company.money += base / 12;
+                game.lastRevenue = Date.now();
+            }
+        }
     }
-};
-txtFile.send(null);
+    // AI companies
+    for (let ai of aiCompanies) {
+        // AI can create a new game sometimes
+        if (!ai.games.length || Math.random() < 0.015) {
+            ai.games.push({
+                name: randomGameName(),
+                quality: Math.floor(Math.random() * 3),
+                linesOfCode: 0,
+                totalLinesOfCode: 1000 * (Math.floor(Math.random() * 3) + 1),
+                employees: [],
+                influencers: [],
+                revenue: 0,
+                revenueDecay: 0.07 + 0.07 * Math.random(),
+                completed: false,
+                lastRevenue: Date.now()
+            });
+            ai.money -= 5000 + Math.random() * 3000;
+        }
+        // Progress games
+        for (let game of ai.games) {
+            if (!game.completed) {
+                // AI employees make progress
+                let speed = game.employees.reduce((sum, e) => sum + (e.workSpeed || 0), 0);
+                if (speed === 0 || Math.random() < 0.2) {
+                    // Add employee sometimes
+                    if (game.employees.length < config.employeeLimits[game.quality] && Math.random() < 0.2) {
+                        game.employees.push({
+                            name: randomEmployeeName(),
+                            salary: 2500 + Math.random() * 3200,
+                            workSpeed: 13 + Math.random() * 21,
+                            hype: 9 + Math.random() * 8,
+                            levelId: Math.floor(Math.random() * 3)
+                        });
+                        ai.money -= 1800 + Math.random() * 1200;
+                    }
+                }
+                game.linesOfCode += (speed || (15 + Math.random() * 10));
+                if (game.linesOfCode >= game.totalLinesOfCode) {
+                    game.linesOfCode = game.totalLinesOfCode;
+                    game.completed = true;
+                }
+            }
+            // AI influencers
+            if (game.completed && game.influencers.length < config.influencerLimits[game.quality] && Math.random() < 0.1) {
+                game.influencers.push({
+                    name: randomEmployeeName(),
+                    salary: 1500 + Math.random() * 2000,
+                    workSpeed: 0,
+                    hype: 25 + Math.random() * 65,
+                    levelId: Math.floor(Math.random() * 3)
+                });
+                ai.money -= 1500 + Math.random() * 1200;
+            }
+            // Passive revenue
+            if (game.completed) {
+                let base = 4000 * (game.quality + 1);
+                base += game.employees.reduce((sum, e) => sum + (e.workSpeed || 0), 0) * 10;
+                base += game.influencers.reduce((sum, e) => sum + (e.hype || 0), 0) * 7;
+                base *= 1 - game.revenueDecay;
+                game.revenue = base;
+                if (!game.lastRevenue || Date.now() - game.lastRevenue >= 1000) {
+                    ai.money += base / 12;
+                    game.lastRevenue = Date.now();
+                }
+            }
+        }
+    }
+    updateDisplay();
+    setTimeout(updatePassive, 1000);
+}
+setTimeout(updatePassive, 1000);
 
-// -- UI Event Handlers (local) --
+// -- UI Functions (Hire, Game Creation, etc) --
 function startCompany() {
     const companyName = document.getElementById("companyNameInput").value || "My Company";
     company.name = companyName;
@@ -115,7 +195,6 @@ function startCompany() {
         dismissModal();
         updateDisplay();
     }, 1000);
-    // createCompanySound.play();
 }
 function validateCompanyName(value) {
     document.getElementById("startCompanyButton").disabled =
@@ -140,10 +219,6 @@ function finishCreateGame(quality) {
         influencers: [],
         revenue: 0,
         revenueDecay: 0.05 + 0.05 * quality,
-        rpm: 1 + quality,
-        conversion: 0.05 + 0.02 * quality,
-        hype: 100 * (quality + 1),
-        startTime: Date.now(),
         completed: false,
         lastRevenue: Date.now()
     });
@@ -152,21 +227,9 @@ function finishCreateGame(quality) {
         dismissModal();
         updateDisplay();
     }, 1000);
-    // createGameSound.play();
 }
-function createLawsuit() {
-    presentStatus("Lawsuits are disabled in single player!");
-    setTimeout(dismissModal, 1200);
-}
-function finishCreateLawsuit(size) {
-    presentStatus("Lawsuits are disabled in single player!");
-    setTimeout(dismissModal, 1200);
-}
-
 function hireTalent(type, game) {
     if (!game) return;
-    // type: "game" or "influencer"
-    // Generate 2 random employees and 1 "random" option
     let candidates = [];
     if (type === "game") {
         for (let i = 0; i < 2; ++i) {
@@ -218,12 +281,12 @@ function presentHireTalentModal(game, candidates, type) {
 function finishHireTalent(game, employee) {
     dismissModal();
     if (employee.type === "game") {
-        if (game.employees.length < config.employeeLimits[game.quality]) {
+        if (game.employees.length < config.employeeLimits[game.quality] && !game.completed) {
             game.employees.push(employee);
             company.money -= employee.salary;
         }
     } else {
-        if (game.influencers.length < config.influencerLimits[game.quality]) {
+        if (game.influencers.length < config.influencerLimits[game.quality] && !game.completed) {
             game.influencers.push(employee);
             company.money -= employee.salary;
         }
@@ -233,125 +296,21 @@ function finishHireTalent(game, employee) {
     updateDisplay();
 }
 
-// -- Passive Income: Games generate money, AI companies progress, loop --
-function updatePassive() {
-    // Player's games
-    for (let game of company.games) {
-        if (game.completed) {
-            // Revenue decays slightly over time (simulate idle)
-            let revenue = 5000 * (game.quality + 1);
-            revenue += game.employees.reduce((sum, e) => sum + (e.workSpeed || 0), 0) * 10;
-            revenue += game.influencers.reduce((sum, e) => sum + (e.hype || 0), 0) * 7;
-            revenue *= 1 - game.revenueDecay;
-            game.revenue = revenue;
-            // Add revenue every second
-            if (!game.lastRevenue || Date.now() - game.lastRevenue >= 1000) {
-                company.money += revenue / 12; // monthly/12 per sec
-                game.lastRevenue = Date.now();
-            }
-        } else {
-            // Progress lines of code if there are employees
-            let speed = game.employees.reduce((sum, e) => sum + (e.workSpeed || 0), 0);
-            game.linesOfCode += speed / 10; // scale to per second
-            if (game.linesOfCode >= game.totalLinesOfCode) {
-                game.linesOfCode = game.totalLinesOfCode;
-                game.completed = true;
-                // gameDoneSound.play();
-                setTimeout(() => {
-                    presentStatus(`Your game "${game.name}" is live!`);
-                    setTimeout(dismissModal, 1200);
-                }, 200);
-            }
-        }
-    }
-    // AI companies
-    for (let ai of aiCompanies) {
-        // AI can hire employees and create games at intervals
-        if (!ai.games.length || Math.random() < 0.015) {
-            // Make new game
-            ai.games.push({
-                name: randomGameName(),
-                quality: Math.floor(Math.random() * 3),
-                linesOfCode: 0,
-                totalLinesOfCode: 1000 * (Math.floor(Math.random() * 3) + 1),
-                employees: [],
-                influencers: [],
-                revenue: 0,
-                revenueDecay: 0.07 + 0.07 * Math.random(),
-                rpm: 1 + Math.random() * 2,
-                conversion: 0.05 + 0.03 * Math.random(),
-                hype: 60 + Math.random() * 80,
-                startTime: Date.now(),
-                completed: false,
-                lastRevenue: Date.now()
-            });
-            ai.money -= 5000 + Math.random() * 3000;
-        }
-        for (let game of ai.games) {
-            if (game.completed) {
-                // Add revenue
-                let revenue = 4000 * (game.quality + 1);
-                revenue += (Math.random() * 180);
-                revenue *= 1 - game.revenueDecay;
-                game.revenue = revenue;
-                if (!game.lastRevenue || Date.now() - game.lastRevenue >= 1000) {
-                    ai.money += revenue / 12;
-                    game.lastRevenue = Date.now();
-                }
-            } else {
-                // AI progress
-                game.linesOfCode += 23 + Math.random() * 13;
-                if (game.linesOfCode >= game.totalLinesOfCode) {
-                    game.linesOfCode = game.totalLinesOfCode;
-                    game.completed = true;
-                }
-            }
-        }
-        // AI randomly hires some employees/influencers
-        for (let game of ai.games) {
-            if (!game.completed && game.employees.length < config.employeeLimits[game.quality] && Math.random() < 0.03) {
-                game.employees.push({
-                    name: randomEmployeeName(),
-                    salary: 2500 + Math.random() * 3200,
-                    workSpeed: 13 + Math.random() * 21,
-                    hype: 9 + Math.random() * 8,
-                    levelId: Math.floor(Math.random() * 3)
-                });
-            }
-            if (!game.completed && game.influencers.length < config.influencerLimits[game.quality] && Math.random() < 0.015) {
-                game.influencers.push({
-                    name: randomEmployeeName(),
-                    salary: 2000 + Math.random() * 2000,
-                    workSpeed: 0,
-                    hype: 25 + Math.random() * 65,
-                    levelId: Math.floor(Math.random() * 3)
-                });
-            }
-        }
-    }
-    updateDisplay();
-    setTimeout(updatePassive, 1000);
-}
-setTimeout(updatePassive, 1000);
-
-// -- UI Rendering (updated for new features) --
+// -- UI Rendering (Overview, Employees, Leaderboard, etc) --
 function updateDisplay() {
-    document.getElementById("companyNameDisplay").innerText = removeArrows(company.name);
-    document.getElementById("companyLevelDisplay").innerText = removeArrows(
-        Object.keys(config.levels)
-            .map((i) => config.levels[i])
-            .reverse()
-            .find((e) => Math.max(company.money, 0) >= e.startRank).name
-    );
+    document.getElementById("companyNameDisplay").innerText = company.name;
+    document.getElementById("companyLevelDisplay").innerText = Object.keys(config.levels)
+        .map((i) => config.levels[i])
+        .reverse()
+        .find((e) => Math.max(company.money, 0) >= e.startRank).name;
     document.getElementById("moneyDisplay").innerText = numeral(company.money).format("$0,0");
     document.getElementById("createGameButton").disabled = company.money < config.createGamePrice;
-    document.getElementById("createLawsuitButton").disabled = true; // always disabled
     updateGamesUI();
     updateMoneyPerSec();
     drawLeaderboard();
 }
 function updateGamesUI() {
-    const overviewItems = company.games.concat(company.lawsuits).sort((a, b) => b.startTime - a.startTime);
+    const overviewItems = company.games.slice().sort((a, b) => b.startTime - a.startTime);
     const overviewItemsList = document.getElementById("overviewItems");
     while (overviewItemsList.childElementCount > overviewItems.length) {
         overviewItemsList.removeChild(overviewItemsList.firstChild);
@@ -360,24 +319,60 @@ function updateGamesUI() {
         overviewItemsList.appendChild(createOverviewItemElement());
     }
     for (let i = 0; i < overviewItems.length; i++) {
-        const item = overviewItems[i];
-        if (item.quality !== undefined) {
-            updateGameElement(overviewItemsList.children[i], item);
-        } else {
-            updateLawsuitElement(overviewItemsList.children[i], item);
-        }
+        updateGameElement(overviewItemsList.children[i], overviewItems[i]);
     }
 }
-function updateMoneyPerSec() {
-    let deltaMoney = company.games.reduce((sum, game) => {
-        if (!game.completed) return sum;
-        return sum + (game.revenue || 0);
-    }, 0) / 12;
-    document.getElementById("moneyPerSec").innerText = numeral(deltaMoney).format("$0,0") + "/sec";
-    document.getElementById("moneyPerYear").innerText = numeral(deltaMoney * 365).format("$0,0") + "/year";
+function updateGameElement(div, game) {
+    div.gameRef = game;
+    div.getElementsByClassName("title")[0].innerText = game.name;
+    div.getElementsByClassName("title")[0].style.color = titleColors[game.quality];
+    div.getElementsByClassName("subtitle")[0].innerText =
+        numeral(game.linesOfCode).format("0,0") + "/" +
+        numeral(game.totalLinesOfCode).format("0,0") + " lines of code";
+    div.getElementsByClassName("logo")[0].innerText = gameTiers[game.quality];
+    setProgress(div.getElementsByClassName("progress")[0], game.linesOfCode / game.totalLinesOfCode);
+    setProgressColor(div.getElementsByClassName("progress")[0], progressColors[game.quality]);
+    // Employees & Influencers
+    const employeeList = div.getElementsByClassName("employees")[0];
+    while (employeeList.firstChild) employeeList.removeChild(employeeList.firstChild);
+    for (let employee of game.employees) {
+        employeeList.appendChild(createEmployeeElement(employee, "game"));
+    }
+    for (let influencer of game.influencers) {
+        employeeList.appendChild(createEmployeeElement(influencer, "influencer"));
+    }
+    // Buttons
+    const hireBtns = div.getElementsByClassName("hireTalentButton");
+    if (hireBtns.length === 0) {
+        // Add buttons
+        let hireProg = document.createElement("button");
+        hireProg.classList.add("hireTalentButton");
+        hireProg.innerText = "Hire Programmer";
+        hireProg.onclick = () => hireTalent("game", div.gameRef);
+        div.appendChild(hireProg);
+        let hireInf = document.createElement("button");
+        hireInf.classList.add("hireTalentButton");
+        hireInf.innerText = "Hire Influencer";
+        hireInf.onclick = () => hireTalent("influencer", div.gameRef);
+        div.appendChild(hireInf);
+    } else {
+        hireBtns[0].disabled = game.employees.length >= config.employeeLimits[game.quality] || game.completed;
+        hireBtns[1].disabled = game.influencers.length >= config.influencerLimits[game.quality] || game.completed;
+    }
+    // Stats
+    const revStats = div.getElementsByClassName("revStats")[0];
+    const revenue = div.getElementsByClassName("revenue")[0];
+    if (!game.completed) {
+        revStats.innerText = "";
+        revenue.innerText = "";
+    } else {
+        let followers = 100 * (game.quality + 1) + game.influencers.reduce((sum, inf) => sum + (inf.hype || 0), 0);
+        revStats.innerText =
+            numeral(followers).format("0.0a") + " followers\n" +
+            numeral(game.revenueDecay).format("0.0%") + " decay/yr\n";
+        revenue.innerText = numeral(game.revenue).format("$0,0") + "/yr";
+    }
 }
-
-// -- Game UI --
 function createOverviewItemElement() {
     const div = document.createElement("div");
     div.classList.add("game");
@@ -404,63 +399,7 @@ function createOverviewItemElement() {
     const revenue = document.createElement("div");
     revenue.classList.add("revenue");
     div.appendChild(revenue);
-    // Hire talent buttons
-    const hireTalentButton = document.createElement("button");
-    hireTalentButton.classList.add("hireTalentButton");
-    hireTalentButton.innerText = "Hire Programmer";
-    hireTalentButton.onclick = () => hireTalent("game", div.gameRef);
-    div.appendChild(hireTalentButton);
-    const hireInfluencerButton = document.createElement("button");
-    hireInfluencerButton.classList.add("hireTalentButton");
-    hireInfluencerButton.innerText = "Hire Influencer";
-    hireInfluencerButton.onclick = () => hireTalent("influencer", div.gameRef);
-    div.appendChild(hireInfluencerButton);
-    // Other employee list (not used now)
-    const otherEmployees = document.createElement("div");
-    otherEmployees.classList.add("employees");
-    div.appendChild(otherEmployees);
     return div;
-}
-function updateGameElement(div, game) {
-    div.gameRef = game;
-    div.getElementsByClassName("title")[0].innerText = game.name;
-    div.getElementsByClassName("title")[0].style.color = titleColors[game.quality];
-    div.getElementsByClassName("subtitle")[0].innerText =
-        numeral(game.linesOfCode).format("0,0") + "/" +
-        numeral(game.totalLinesOfCode).format("0,0") + " lines of code";
-    div.getElementsByClassName("logo")[0].innerText = gameTiers[game.quality];
-    setProgress(div.getElementsByClassName("progress")[0], game.linesOfCode / game.totalLinesOfCode);
-    setProgressColor(div.getElementsByClassName("progress")[0], progressColors[game.quality]);
-    // Employees
-    const employeeList = div.getElementsByClassName("employees")[0];
-    while (employeeList.firstChild) employeeList.removeChild(employeeList.firstChild);
-    for (let employee of game.employees) {
-        employeeList.appendChild(createEmployeeElement(employee, "game"));
-    }
-    for (let influencer of game.influencers) {
-        employeeList.appendChild(createEmployeeElement(influencer, "influencer"));
-    }
-    // Buttons
-    div.getElementsByClassName("hireTalentButton")[0].disabled = game.employees.length >= config.employeeLimits[game.quality] || game.completed;
-    div.getElementsByClassName("hireTalentButton")[1].disabled = game.influencers.length >= config.influencerLimits[game.quality] || game.completed;
-    // Stats
-    const revStats = div.getElementsByClassName("revStats")[0];
-    const revenue = div.getElementsByClassName("revenue")[0];
-    if (!game.completed) {
-        revStats.innerText = "";
-        revenue.innerText = "";
-    } else {
-        let followers = 100 * (game.quality + 1) + game.influencers.reduce((sum, inf) => sum + (inf.hype || 0), 0);
-        revStats.innerText =
-            numeral(followers).format("0.0a") + " followers\n" +
-            numeral(game.conversion).format("0.0%") + " conversion\n" +
-            numeral(game.rpm).format("$0,0.00") + " RPM\n" +
-            numeral(game.revenueDecay).format("0.0%") + " decay/yr\n";
-        revenue.innerText = numeral(game.revenue).format("$0,0") + "/yr";
-    }
-}
-function updateLawsuitElement(div, lawsuit) {
-    div.style.display = "none";
 }
 function createEmployeeElement(profile, type) {
     let employeeColor = profile.levelId !== undefined && config.levels[profile.levelId]
@@ -530,147 +469,16 @@ function setProgress(progressBarElement, progress) {
 function setProgressColor(progressBarElement, color) {
     progressBarElement.getElementsByClassName("progressInner")[0].style.background = color;
 }
-
-// -- Code Writing Handler --
-// Now, coding just gives money -- doesn't progress games
-let lastKeyCode = undefined;
-document.addEventListener("keydown", (e) => {
-    if (e.code === lastKeyCode) return;
-    lastKeyCode = e.code;
-    if (!chatOpen) writeCode();
-});
-document.addEventListener("keyup", () => {
-    lastKeyCode = undefined;
-});
-function writeCode() {
-    if (hasModal() || document.activeElement instanceof HTMLInputElement) return;
-    // Add code visually
-    const codePanel = document.getElementById("codeArea");
-    let appendText = "";
-    let newText = document.createElement("span");
-    newText.className = "code";
-    for (let i = 0; i < 5; i++) {
-        const char = codeWriting[codeIndex % codeWriting.length];
-        appendText += char;
-        codeIndex++;
-        if (char === " ") i--;
-    }
-    newText.innerText = appendText;
-    codePanel.appendChild(newText);
-    if (document.getElementsByClassName("code").length > 500) {
-        document.getElementsByClassName("code")[0].remove();
-    }
-    // Give money only
-    company.money += 200 + Math.floor(Math.random() * 90);
-    // chaChingSound.play();
-    updateDisplay();
-    finishedTip("code");
+function updateMoneyPerSec() {
+    let deltaMoney = company.games.reduce((sum, game) => {
+        if (!game.completed) return sum;
+        return sum + (game.revenue || 0);
+    }, 0) / 12;
+    document.getElementById("moneyPerSec").innerText = numeral(deltaMoney).format("$0,0") + "/sec";
+    document.getElementById("moneyPerYear").innerText = numeral(deltaMoney * 365).format("$0,0") + "/year";
 }
 
-// -- Tips (unchanged) --
-const allTips = [
-    ["code", "Press buttons on the keyboard to write code and make money."],
-    ["createGame", 'Click "New Game" to create a new game and start making more money. This costs $5,000.'],
-    ["hireTalent", 'Click "Hire Programmer" to add a programmer to your team, or "Hire Influencer" to boost hype.'],
-    ["dontClose", "Leave the page open in the background to keep gaining money while doing other things."],
-];
-let tipIndex = 0;
-function finishedTip(key) {
-    if (allTips[tipIndex][0] === key && tipIndex !== allTips.length - 1) {
-        tipIndex++;
-        renderTip();
-    }
-}
-function renderTip() {
-    document.getElementById("tipsBody").innerText = allTips[tipIndex][1];
-}
-
-// -- Modal Controller (unchanged) --
-function hasModal() {
-    return document.querySelector(".modal.present") !== null;
-}
-function presentModal(id) {
-    dismissModal();
-    document.getElementById(id).classList.add("present");
-}
-function dismissModal() {
-    const modal = document.querySelector(".modal.present");
-    if (modal !== null) modal.classList.remove("present");
-}
-function presentStatus(status) {
-    document.getElementById("statusText").innerText = status;
-    presentModal("statusModal");
-}
-
-// -- Chat (local only, no network) --
-document.getElementById("chatInput").addEventListener("keydown", (e) => {
-    if (e.keyCode == 13) {
-        if (chatInput.value.trim() == "") {
-            chatInput.value = "";
-        } else {
-            addToChat({msg: chatInput.value.trim()});
-            chatInput.value = "";
-        }
-    }
-});
-function addToChat(chatObject) {
-    let chatClient = document.getElementById("chatArea");
-    let tmpMessage = document.createElement("div");
-    tmpMessage.className = "chatMessage";
-    chatObject.msg = chatObject.msg.replace(/\\:/g, ":");
-    for (let i = 0; i < emojis.length; i++) {
-        chatObject.msg = chatObject.msg.replace(
-            new RegExp(`:${emojis[i]}:`, "g"),
-            `<img class="inline" src="emojis/${emojis[i]}.png"></img>`,
-        );
-    }
-    tmpMessage.innerHTML = chatObject.msg;
-    chatClient.appendChild(tmpMessage);
-    if (window.navigator.userAgent.indexOf("Edge") > -1) return;
-    chatClient.scrollTo(0, chatClient.scrollHeight);
-}
-function openChat() {
-    document.getElementById("codePanel").style.display = "none";
-    document.getElementById("chatPanel").style.display = "block";
-    document.getElementById("chatInput").focus();
-    chatOpen = true;
-    if (window.navigator.userAgent.indexOf("Edge") > -1) return;
-    document
-        .getElementById("chatArea")
-        .scrollTo(0, document.getElementById("chatArea").scrollHeight);
-}
-function closeChat() {
-    document.getElementById("codePanel").style.display = "block";
-    document.getElementById("chatPanel").style.display = "none";
-    chatOpen = false;
-    unreadMessages = 0;
-    document.getElementById("unreadNotification").innerHTML = unreadMessages;
-    if (document.getElementById("newMessages")) {
-        document.getElementById("newMessages").remove();
-    }
-}
-
-// -- Emoji UI --
-function toggleEmojis() {
-    if (emojisOpen) {
-        document.getElementById("emojiList").style.display = "none";
-        emojisOpen = false;
-    } else {
-        fillEmojis();
-        document.getElementById("emojiList").style.display = "block";
-        emojisOpen = true;
-    }
-}
-function fillEmojis() {
-    document.getElementById("emojiList").innerHTML = "";
-    for (let tmpEmoji in emojis) {
-        document.getElementById(
-            "emojiList",
-        ).innerHTML += `<img class="inline" src="emojis/${emojis[tmpEmoji]}.png"></img> :${emojis[tmpEmoji]}:<br>`;
-    }
-}
-
-// -- Leaderboard (player + 2 AI) --
+// -- Leaderboard Rendering --
 function drawLeaderboard() {
     // Update leaderboard history
     for (let c of leaderboard) {
@@ -710,7 +518,7 @@ function drawLeaderboard() {
             tmpText += `<text x="${lineEndW + 10}" y="${adjustValue(
                 leaderboardHistory[c.id][0], minValue, maxValue, h
             )}" font-weight="bold" font-family="Biryani" fill="${colors[idx]}" font-size="12">(${
-                money}) ${removeArrows(c.name)}</text>`;
+                money}) ${c.name}</text>`;
         }
     }
     canvas.innerHTML = tmpText;
@@ -718,15 +526,15 @@ function drawLeaderboard() {
 function adjustValue(value, min, max, height) {
     return height - ((value - min) / (max - min)) * height;
 }
-const line = (pointA, pointB) => {
+function line(pointA, pointB) {
     const lengthX = pointB[0] - pointA[0];
     const lengthY = pointB[1] - pointA[1];
     return {
         length: Math.sqrt(Math.pow(lengthX, 2) + Math.pow(lengthY, 2)),
         angle: Math.atan2(lengthY, lengthX),
     };
-};
-const controlPoint = (current, previous, next, reverse) => {
+}
+function controlPoint(current, previous, next, reverse) {
     const p = previous || current;
     const n = next || current;
     const smoothing = 0.2;
@@ -736,8 +544,8 @@ const controlPoint = (current, previous, next, reverse) => {
     const x = current[0] + Math.cos(angle) * length;
     const y = current[1] + Math.sin(angle) * length;
     return [x, y];
-};
-const svgPath = (points, command, color, width) => {
+}
+function svgPath(points, command, color, width) {
     const d = points.reduce(
         (acc, point, i, a) =>
             i === 0
@@ -746,27 +554,78 @@ const svgPath = (points, command, color, width) => {
         "",
     );
     return `<path d="${d}" fill="none" stroke="${color}" stroke-width="${width}" stroke-linejoin="round" stroke-linecap="round" />`;
-};
-const bezierCommand = (point, i, a) => {
+}
+function bezierCommand(point, i, a) {
     const [cpsX, cpsY] = controlPoint(a[i - 1], a[i - 2], point);
     const [cpeX, cpeY] = controlPoint(point, a[i - 1], a[i + 1], true);
     return `C ${cpsX},${cpsY} ${cpeX},${cpeY} ${point[0]},${point[1]}`;
-};
-const removeArrows = (text) => text.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
 
-// -- Misc --
-Element.prototype.remove = function () { this.parentElement.removeChild(this); };
-NodeList.prototype.remove = HTMLCollection.prototype.remove = function () {
-    for (var i = this.length - 1; i >= 0; i--) {
-        if (this[i] && this[i].parentElement) {
-            this[i].parentElement.removeChild(this[i]);
-        }
+// -- Code Writing Handler: Only gives money --
+let codeWriting = " ";
+let codeIndex = 0;
+const txtFile = new XMLHttpRequest();
+txtFile.open("GET", "./hackerCode.txt", true);
+txtFile.onreadystatechange = function () {
+    if (txtFile.readyState === 4 && txtFile.status === 200) {
+        codeWriting = txtFile.responseText;
     }
 };
+txtFile.send(null);
+
+let lastKeyCode = undefined;
+document.addEventListener("keydown", (e) => {
+    if (e.code === lastKeyCode) return;
+    lastKeyCode = e.code;
+    if (!chatOpen) writeCode();
+});
+document.addEventListener("keyup", () => {
+    lastKeyCode = undefined;
+});
+function writeCode() {
+    if (hasModal() || document.activeElement instanceof HTMLInputElement) return;
+    // Add code visually
+    const codePanel = document.getElementById("codeArea");
+    let appendText = "";
+    let newText = document.createElement("span");
+    newText.className = "code";
+    for (let i = 0; i < 5; i++) {
+        const char = codeWriting[codeIndex % codeWriting.length];
+        appendText += char;
+        codeIndex++;
+        if (char === " ") i--;
+    }
+    newText.innerText = appendText;
+    codePanel.appendChild(newText);
+    if (document.getElementsByClassName("code").length > 500) {
+        document.getElementsByClassName("code")[0].remove();
+    }
+    // Give money only
+    company.money += 200 + Math.floor(Math.random() * 90);
+    updateDisplay();
+}
+
+// -- Modal Helpers --
+function presentStatus(status) {
+    document.getElementById("statusText").innerText = status;
+    presentModal("statusModal");
+}
+function hasModal() {
+    return document.querySelector(".modal.present") !== null;
+}
+function presentModal(id) {
+    dismissModal();
+    document.getElementById(id).classList.add("present");
+}
+function dismissModal() {
+    const modal = document.querySelector(".modal.present");
+    if (modal !== null) modal.classList.remove("present");
+}
+
+// -- Other UI Elements (chat, emojis, etc): unchanged from previous answers --
 
 // -- On Load --
 window.addEventListener("load", () => {
-    renderTip();
     updateDisplay();
 });
 

@@ -1,13 +1,15 @@
-// === Game Inc. Single-Player Edition with AI, Hiring, and Employee List (no HTML change needed) ===
+// === Game Inc. Single-Player Edition with AI, Hiring, Employee List, and Salary Display (no HTML change needed) ===
 
 /*
- * This script implements:
- * - Hire Programmers/Influencers (shows in a modal, works with original HTML structure)
+ * Features:
+ * - Hire Programmers/Influencers (works with original HTML structure)
  * - 2 AI companies
  * - Passive income from completed games (auto, even if not coding)
- * - Code writing gives instant cash (NOT progress to games)
+ * - Code writing gives instant cash (NOT game progress)
  * - Random game names
- * - Employee list appears in an overview modal (using chat for output, since there is no dedicated panel in HTML)
+ * - Employee list shown in chat (type "team" in chat to see)
+ * - Each employee entry shows Name, Lines/sec, Followers, and Price (salary/sec)
+ * - Fixes the "freeze at selecting programmers" bug
  *
  * No changes to HTML required!
  */
@@ -265,14 +267,14 @@ function presentHireTalentModal(game, candidates, type) {
     holders[0].appendChild(createEmployeeElement(candidates[0], type));
     holders[1].appendChild(createEmployeeElement(candidates[1], type));
     holders[2].appendChild(createEmployeeElement("random", type));
-    // The original HTML uses three <button class="finishCreateLawsuitButton" ...> for "Hire" actions.
-    // We attach handlers by index in document.getElementsByClassName("finishCreateLawsuitButton")
+    // Attach handlers only after DOM is ready and buttons exist
     setTimeout(() => {
-        const buttons = document.getElementsByClassName("finishCreateLawsuitButton");
-        if (buttons.length >= 3) {
-            buttons[0].onclick = () => finishHireTalent(game, candidates[0]);
-            buttons[1].onclick = () => finishHireTalent(game, candidates[1]);
-            buttons[2].onclick = () => finishHireTalent(game, {
+        // Find all buttons in the modal (original HTML structure)
+        const hireBtns = document.querySelectorAll("#hireTalentModal button.finishCreateLawsuitButton");
+        if (hireBtns.length >= 3) {
+            hireBtns[0].onclick = () => finishHireTalent(game, candidates[0]);
+            hireBtns[1].onclick = () => finishHireTalent(game, candidates[1]);
+            hireBtns[2].onclick = () => finishHireTalent(game, {
                 name: "Random",
                 salary: 4000 + Math.floor(Math.random() * 3000),
                 workSpeed: 12 + Math.random() * 9,
@@ -304,7 +306,6 @@ function finishHireTalent(game, employee) {
 
 // -- Employee List Output (in chat area for this HTML) --
 function updateEmployeeList() {
-    // List all programmers/influencers from all games
     let employees = [];
     for (const game of company.games) {
         for (const prog of game.employees || []) {
@@ -312,7 +313,8 @@ function updateEmployeeList() {
                 name: prog.name,
                 type: "Programmer",
                 lines: prog.workSpeed || 0,
-                followers: 0
+                followers: 0,
+                salary: prog.salary || 0
             });
         }
         for (const inf of game.influencers || []) {
@@ -320,20 +322,24 @@ function updateEmployeeList() {
                 name: inf.name,
                 type: "Influencer",
                 lines: 0,
-                followers: inf.hype || 0
+                followers: inf.hype || 0,
+                salary: inf.salary || 0
             });
         }
     }
-    let msg = "👥 <b>My Team</b><br><table style='width:100%'><tr><th>Name</th><th>Type</th><th>Lines/sec</th><th>Followers</th></tr>";
+    let msg = "👥 <b>My Team</b><br><table style='width:100%'><tr><th>Name</th><th>Type</th><th>Lines/sec</th><th>Followers</th><th>Price</th></tr>";
     if (employees.length === 0) {
-        msg += "<tr><td colspan='4'>No team members yet!</td></tr>";
+        msg += "<tr><td colspan='5'>No team members yet!</td></tr>";
     } else {
         for (const emp of employees) {
+            // Salary per second (annual / 365 / 24 / 60 / 60)
+            let pricePerSec = emp.salary ? (emp.salary / 365 / 24 / 60 / 60).toFixed(2) : "";
             msg += `<tr>
                 <td>${emp.name}</td>
                 <td>${emp.type}</td>
                 <td>${emp.lines > 0 ? emp.lines.toFixed(1) : ""}</td>
                 <td>${emp.followers > 0 ? emp.followers : ""}</td>
+                <td>${pricePerSec ? pricePerSec + "$/sec" : ""}</td>
             </tr>`;
         }
     }
@@ -521,7 +527,7 @@ function updateMoneyPerSec() {
     document.getElementById("moneyPerYear").innerText = numeral(deltaMoney * 365).format("$0,0") + "/year";
 }
 
-// -- Leaderboard Rendering --
+// -- Leaderboard Rendering (unchanged) --
 function drawLeaderboard() {
     for (let c of leaderboard) {
         if (!leaderboardHistory[c.id]) leaderboardHistory[c.id] = [];
@@ -681,7 +687,6 @@ document.getElementById("chatInput").addEventListener("keydown", (e) => {
         if (chatInput.value.trim() == "") {
             chatInput.value = "";
         } else if (chatInput.value.trim().toLowerCase() === "team") {
-            // Show employee list in chat area
             updateEmployeeList();
             chatInput.value = "";
         } else {

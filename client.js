@@ -1,5 +1,18 @@
 // === Game Inc. Single-Player Edition with AI, Hiring, Employee List, and Salary Display (no HTML change needed) ===
 
+/*
+ * Features:
+ * - Hire Programmers/Influencers (works with original HTML structure)
+ * - 2 AI companies
+ * - Passive income from completed games (auto, even if not coding)
+ * - Code writing gives instant cash (NOT game progress)
+ * - Random game names
+ * - Employee list shown in chat (type "team" in chat to see)
+ * - Each employee entry shows Name, Lines/sec, Followers, and Price (salary/sec)
+ * - Hiring modal now INSTANT, no "Selecting employees..." loading/status
+ * - No HTML changes needed!
+ */
+
 // -- Game Config & Utilities --
 const config = {
     createGamePrice: 5000,
@@ -82,11 +95,11 @@ let unreadMessages = 0;
 
 // -- Passive Update Loop --
 function updatePassive() {
-    // Player's games: employee progress and passive income
+    // Player's games
     for (let game of company.games) {
         if (!game.completed) {
             let speed = game.employees.reduce((sum, e) => sum + (e.workSpeed || 0), 0);
-            game.linesOfCode += speed / 10;
+            game.linesOfCode += speed / 10; // scale to per second
             if (game.linesOfCode >= game.totalLinesOfCode) {
                 game.linesOfCode = game.totalLinesOfCode;
                 game.completed = true;
@@ -255,6 +268,7 @@ function presentHireTalentModal(game, candidates, type) {
     holders[2].appendChild(createEmployeeElement("random", type));
     // Attach handlers only after DOM is ready and buttons exist
     setTimeout(() => {
+        // Find all buttons in the modal (original HTML structure)
         const hireBtns = document.querySelectorAll("#hireTalentModal .finishCreateLawsuitButton");
         if (hireBtns.length >= 3) {
             hireBtns[0].onclick = () => finishHireTalent(game, candidates[0]);
@@ -269,7 +283,7 @@ function presentHireTalentModal(game, candidates, type) {
             });
         }
     }, 0);
-    presentStatus("Selecting employees...");
+    // NO status/loader here!
 }
 function finishHireTalent(game, employee) {
     dismissModal();
@@ -317,6 +331,7 @@ function updateEmployeeList() {
         msg += "<tr><td colspan='5'>No team members yet!</td></tr>";
     } else {
         for (const emp of employees) {
+            // Salary per second (annual / 365 / 24 / 60 / 60)
             let pricePerSec = emp.salary ? (emp.salary / 365 / 24 / 60 / 60).toFixed(2) : "";
             msg += `<tr>
                 <td>${emp.name}</td>

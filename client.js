@@ -1,4 +1,4 @@
-// === Game Inc. Single-Player Edition with AI and Hiring ===
+// === Game Inc. Single-Player Edition with AI, Hiring, and Employee List ===
 
 // -- Game Config --
 const config = {
@@ -22,13 +22,13 @@ const progressColors = [
     "linear-gradient(to right, #9954b0, #ca30fd)",
 ];
 
+// -- Game/Employee Name Generators --
 const adjectives = [
     "Super", "Mega", "Hyper", "Fast", "Cool", "Dough", "Play", "Fun", "Pixel", "Cyber", "Auto", "Cash", "Idle", "Power", "Star"
 ];
 const endings = [
     "io", "X", "Prime", "Run", "World", "Tycoon", "Quest", "Mania", "Inc", "Zone", "Rush", "Saga", "Empire"
 ];
-
 function randomGameName() {
     return (
         adjectives[Math.floor(Math.random() * adjectives.length)] +
@@ -80,31 +80,30 @@ let leaderboard = [company, ...aiCompanies];
 let leaderboardHistory = {};
 leaderboard.forEach(c => leaderboardHistory[c.id] = [c.money]);
 let leaderboardHistorySize = 90;
+let chatOpen = false;
+let emojisOpen = false;
+let unreadMessages = 0;
 
 // -- Passive Update Loop --
 function updatePassive() {
     // Player's games
     for (let game of company.games) {
-        // Progress lines of code if there are employees, but only via employees
+        // Employees make progress
         if (!game.completed) {
             let speed = game.employees.reduce((sum, e) => sum + (e.workSpeed || 0), 0);
             game.linesOfCode += speed / 10; // scale to per second
             if (game.linesOfCode >= game.totalLinesOfCode) {
                 game.linesOfCode = game.totalLinesOfCode;
                 game.completed = true;
-                // Show modal on new completion
                 setTimeout(() => {
                     presentStatus(`Your game "${game.name}" is live!`);
                     setTimeout(dismissModal, 1200);
                 }, 200);
             }
         }
-        // Passive revenue for completed games
         if (game.completed) {
             let base = 5000 * (game.quality + 1);
-            // Programmers: increase RPM (simulates better code = more RPM)
             base += game.employees.reduce((sum, e) => sum + (e.workSpeed || 0), 0) * 10;
-            // Influencers: increase hype
             base += game.influencers.reduce((sum, e) => sum + (e.hype || 0), 0) * 7;
             base *= 1 - game.revenueDecay;
             game.revenue = base;
@@ -116,7 +115,6 @@ function updatePassive() {
     }
     // AI companies
     for (let ai of aiCompanies) {
-        // AI can create a new game sometimes
         if (!ai.games.length || Math.random() < 0.015) {
             ai.games.push({
                 name: randomGameName(),
@@ -132,13 +130,10 @@ function updatePassive() {
             });
             ai.money -= 5000 + Math.random() * 3000;
         }
-        // Progress games
         for (let game of ai.games) {
             if (!game.completed) {
-                // AI employees make progress
                 let speed = game.employees.reduce((sum, e) => sum + (e.workSpeed || 0), 0);
                 if (speed === 0 || Math.random() < 0.2) {
-                    // Add employee sometimes
                     if (game.employees.length < config.employeeLimits[game.quality] && Math.random() < 0.2) {
                         game.employees.push({
                             name: randomEmployeeName(),
@@ -156,7 +151,6 @@ function updatePassive() {
                     game.completed = true;
                 }
             }
-            // AI influencers
             if (game.completed && game.influencers.length < config.influencerLimits[game.quality] && Math.random() < 0.1) {
                 game.influencers.push({
                     name: randomEmployeeName(),
@@ -167,7 +161,6 @@ function updatePassive() {
                 });
                 ai.money -= 1500 + Math.random() * 1200;
             }
-            // Passive revenue
             if (game.completed) {
                 let base = 4000 * (game.quality + 1);
                 base += game.employees.reduce((sum, e) => sum + (e.workSpeed || 0), 0) * 10;
@@ -220,7 +213,8 @@ function finishCreateGame(quality) {
         revenue: 0,
         revenueDecay: 0.05 + 0.05 * quality,
         completed: false,
-        lastRevenue: Date.now()
+        lastRevenue: Date.now(),
+        startTime: Date.now()
     });
     presentStatus("Game created!");
     setTimeout(() => {
@@ -257,25 +251,26 @@ function hireTalent(type, game) {
     presentHireTalentModal(game, candidates, type);
 }
 function presentHireTalentModal(game, candidates, type) {
-    const modal = document.getElementById("hireTalentModal");
-    const holders = modal.getElementsByClassName("employeeHolder");
+    presentModal("hireTalentModal");
+    // Fill employeeHolders with candidates
+    const holders = document.getElementsByClassName("employeeHolder");
     for (let h of holders) while (h.firstChild) h.removeChild(h.firstChild);
     holders[0].appendChild(createEmployeeElement(candidates[0], type));
     holders[1].appendChild(createEmployeeElement(candidates[1], type));
     holders[2].appendChild(createEmployeeElement("random", type));
-    // Set buttons
-    const finishButtons = modal.querySelectorAll("button[onclick^='finishHireTalent']");
-    finishButtons[0].onclick = () => finishHireTalent(game, candidates[0]);
-    finishButtons[1].onclick = () => finishHireTalent(game, candidates[1]);
-    finishButtons[2].onclick = () => finishHireTalent(game, {
-        name: "Random",
-        salary: 4000 + Math.floor(Math.random() * 3000),
-        workSpeed: 12 + Math.random() * 9,
-        hype: 20 + Math.random() * 30,
-        levelId: Math.floor(Math.random() * 3),
-        type
-    });
-    presentModal("hireTalentModal");
+    // Set handlers by ID (update your HTML to have these IDs)
+    setTimeout(() => {
+        document.getElementById("hireTalentBtn0").onclick = () => finishHireTalent(game, candidates[0]);
+        document.getElementById("hireTalentBtn1").onclick = () => finishHireTalent(game, candidates[1]);
+        document.getElementById("hireTalentBtnRandom").onclick = () => finishHireTalent(game, {
+            name: "Random",
+            salary: 4000 + Math.floor(Math.random() * 3000),
+            workSpeed: 12 + Math.random() * 9,
+            hype: 20 + Math.random() * 30,
+            levelId: Math.floor(Math.random() * 3),
+            type
+        });
+    }, 0);
     presentStatus("Selecting employees...");
 }
 function finishHireTalent(game, employee) {
@@ -296,6 +291,51 @@ function finishHireTalent(game, employee) {
     updateDisplay();
 }
 
+// -- Employee List Rendering --
+function updateEmployeeList() {
+    let employees = [];
+    for (const game of company.games) {
+        for (const prog of game.employees || []) {
+            employees.push({
+                name: prog.name,
+                type: "Programmer",
+                lines: prog.workSpeed || 0,
+                followers: 0
+            });
+        }
+        for (const inf of game.influencers || []) {
+            employees.push({
+                name: inf.name,
+                type: "Influencer",
+                lines: 0,
+                followers: inf.hype || 0
+            });
+        }
+    }
+    const tbody = document.querySelector("#employeeListTable tbody");
+    if (!tbody) return;
+    tbody.innerHTML = "";
+    if (employees.length === 0) {
+        const tr = document.createElement("tr");
+        const td = document.createElement("td");
+        td.colSpan = 4;
+        td.innerText = "No team members yet!";
+        tr.appendChild(td);
+        tbody.appendChild(tr);
+        return;
+    }
+    for (const emp of employees) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${emp.name}</td>
+          <td>${emp.type}</td>
+          <td>${emp.lines > 0 ? emp.lines.toFixed(1) : ""}</td>
+          <td>${emp.followers > 0 ? emp.followers : ""}</td>
+        `;
+        tbody.appendChild(tr);
+    }
+}
+
 // -- UI Rendering (Overview, Employees, Leaderboard, etc) --
 function updateDisplay() {
     document.getElementById("companyNameDisplay").innerText = company.name;
@@ -308,6 +348,7 @@ function updateDisplay() {
     updateGamesUI();
     updateMoneyPerSec();
     drawLeaderboard();
+    updateEmployeeList();
 }
 function updateGamesUI() {
     const overviewItems = company.games.slice().sort((a, b) => b.startTime - a.startTime);
@@ -335,16 +376,15 @@ function updateGameElement(div, game) {
     // Employees & Influencers
     const employeeList = div.getElementsByClassName("employees")[0];
     while (employeeList.firstChild) employeeList.removeChild(employeeList.firstChild);
-    for (let employee of game.employees) {
+    for (const employee of game.employees) {
         employeeList.appendChild(createEmployeeElement(employee, "game"));
     }
-    for (let influencer of game.influencers) {
+    for (const influencer of game.influencers) {
         employeeList.appendChild(createEmployeeElement(influencer, "influencer"));
     }
     // Buttons
-    const hireBtns = div.getElementsByClassName("hireTalentButton");
+    let hireBtns = div.getElementsByClassName("hireTalentButton");
     if (hireBtns.length === 0) {
-        // Add buttons
         let hireProg = document.createElement("button");
         hireProg.classList.add("hireTalentButton");
         hireProg.innerText = "Hire Programmer";
@@ -359,7 +399,6 @@ function updateGameElement(div, game) {
         hireBtns[0].disabled = game.employees.length >= config.employeeLimits[game.quality] || game.completed;
         hireBtns[1].disabled = game.influencers.length >= config.influencerLimits[game.quality] || game.completed;
     }
-    // Stats
     const revStats = div.getElementsByClassName("revStats")[0];
     const revenue = div.getElementsByClassName("revenue")[0];
     if (!game.completed) {
@@ -480,7 +519,6 @@ function updateMoneyPerSec() {
 
 // -- Leaderboard Rendering --
 function drawLeaderboard() {
-    // Update leaderboard history
     for (let c of leaderboard) {
         if (!leaderboardHistory[c.id]) leaderboardHistory[c.id] = [];
         leaderboardHistory[c.id].unshift(c.money);
@@ -621,8 +659,6 @@ function dismissModal() {
     const modal = document.querySelector(".modal.present");
     if (modal !== null) modal.classList.remove("present");
 }
-
-// -- Other UI Elements (chat, emojis, etc): unchanged from previous answers --
 
 // -- On Load --
 window.addEventListener("load", () => {

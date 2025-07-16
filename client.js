@@ -1,6 +1,18 @@
-// === Game Inc. Single-Player Edition with AI, Hiring, and Employee List ===
+// === Game Inc. Single-Player Edition with AI, Hiring, and Employee List (no HTML change needed) ===
 
-// -- Game Config --
+/*
+ * This script implements:
+ * - Hire Programmers/Influencers (shows in a modal, works with original HTML structure)
+ * - 2 AI companies
+ * - Passive income from completed games (auto, even if not coding)
+ * - Code writing gives instant cash (NOT progress to games)
+ * - Random game names
+ * - Employee list appears in an overview modal (using chat for output, since there is no dedicated panel in HTML)
+ *
+ * No changes to HTML required!
+ */
+
+// -- Game Config & Utilities --
 const config = {
     createGamePrice: 5000,
     employeeLimits: [2, 3, 4],   // per game quality
@@ -21,8 +33,6 @@ const progressColors = [
     "linear-gradient(to right, #52B05C, #38FD2F)",
     "linear-gradient(to right, #9954b0, #ca30fd)",
 ];
-
-// -- Game/Employee Name Generators --
 const adjectives = [
     "Super", "Mega", "Hyper", "Fast", "Cool", "Dough", "Play", "Fun", "Pixel", "Cyber", "Auto", "Cash", "Idle", "Power", "Star"
 ];
@@ -48,7 +58,7 @@ function randomAIName(used = []) {
     return pool[Math.floor(Math.random() * pool.length)] || "AI";
 }
 
-// -- Initial Player and AI Companies --
+// -- State --
 function createPlayerCompany() {
     return {
         id: 'local',
@@ -69,8 +79,6 @@ function createAICompany(name, color) {
         isAI: true
     };
 }
-
-// -- State --
 let company = createPlayerCompany();
 let aiCompanies = [
     createAICompany(randomAIName([]), "#FFB300"),
@@ -88,7 +96,6 @@ let unreadMessages = 0;
 function updatePassive() {
     // Player's games
     for (let game of company.games) {
-        // Employees make progress
         if (!game.completed) {
             let speed = game.employees.reduce((sum, e) => sum + (e.workSpeed || 0), 0);
             game.linesOfCode += speed / 10; // scale to per second
@@ -258,18 +265,22 @@ function presentHireTalentModal(game, candidates, type) {
     holders[0].appendChild(createEmployeeElement(candidates[0], type));
     holders[1].appendChild(createEmployeeElement(candidates[1], type));
     holders[2].appendChild(createEmployeeElement("random", type));
-    // Set handlers by ID (update your HTML to have these IDs)
+    // The original HTML uses three <button class="finishCreateLawsuitButton" ...> for "Hire" actions.
+    // We attach handlers by index in document.getElementsByClassName("finishCreateLawsuitButton")
     setTimeout(() => {
-        document.getElementById("hireTalentBtn0").onclick = () => finishHireTalent(game, candidates[0]);
-        document.getElementById("hireTalentBtn1").onclick = () => finishHireTalent(game, candidates[1]);
-        document.getElementById("hireTalentBtnRandom").onclick = () => finishHireTalent(game, {
-            name: "Random",
-            salary: 4000 + Math.floor(Math.random() * 3000),
-            workSpeed: 12 + Math.random() * 9,
-            hype: 20 + Math.random() * 30,
-            levelId: Math.floor(Math.random() * 3),
-            type
-        });
+        const buttons = document.getElementsByClassName("finishCreateLawsuitButton");
+        if (buttons.length >= 3) {
+            buttons[0].onclick = () => finishHireTalent(game, candidates[0]);
+            buttons[1].onclick = () => finishHireTalent(game, candidates[1]);
+            buttons[2].onclick = () => finishHireTalent(game, {
+                name: "Random",
+                salary: 4000 + Math.floor(Math.random() * 3000),
+                workSpeed: 12 + Math.random() * 9,
+                hype: 20 + Math.random() * 30,
+                levelId: Math.floor(Math.random() * 3),
+                type
+            });
+        }
     }, 0);
     presentStatus("Selecting employees...");
 }
@@ -291,8 +302,9 @@ function finishHireTalent(game, employee) {
     updateDisplay();
 }
 
-// -- Employee List Rendering --
+// -- Employee List Output (in chat area for this HTML) --
 function updateEmployeeList() {
+    // List all programmers/influencers from all games
     let employees = [];
     for (const game of company.games) {
         for (const prog of game.employees || []) {
@@ -312,28 +324,21 @@ function updateEmployeeList() {
             });
         }
     }
-    const tbody = document.querySelector("#employeeListTable tbody");
-    if (!tbody) return;
-    tbody.innerHTML = "";
+    let msg = "👥 <b>My Team</b><br><table style='width:100%'><tr><th>Name</th><th>Type</th><th>Lines/sec</th><th>Followers</th></tr>";
     if (employees.length === 0) {
-        const tr = document.createElement("tr");
-        const td = document.createElement("td");
-        td.colSpan = 4;
-        td.innerText = "No team members yet!";
-        tr.appendChild(td);
-        tbody.appendChild(tr);
-        return;
+        msg += "<tr><td colspan='4'>No team members yet!</td></tr>";
+    } else {
+        for (const emp of employees) {
+            msg += `<tr>
+                <td>${emp.name}</td>
+                <td>${emp.type}</td>
+                <td>${emp.lines > 0 ? emp.lines.toFixed(1) : ""}</td>
+                <td>${emp.followers > 0 ? emp.followers : ""}</td>
+            </tr>`;
+        }
     }
-    for (const emp of employees) {
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
-          <td>${emp.name}</td>
-          <td>${emp.type}</td>
-          <td>${emp.lines > 0 ? emp.lines.toFixed(1) : ""}</td>
-          <td>${emp.followers > 0 ? emp.followers : ""}</td>
-        `;
-        tbody.appendChild(tr);
-    }
+    msg += "</table>";
+    addToChat({msg});
 }
 
 // -- UI Rendering (Overview, Employees, Leaderboard, etc) --
@@ -348,7 +353,6 @@ function updateDisplay() {
     updateGamesUI();
     updateMoneyPerSec();
     drawLeaderboard();
-    updateEmployeeList();
 }
 function updateGamesUI() {
     const overviewItems = company.games.slice().sort((a, b) => b.startTime - a.startTime);
@@ -659,6 +663,33 @@ function dismissModal() {
     const modal = document.querySelector(".modal.present");
     if (modal !== null) modal.classList.remove("present");
 }
+
+// -- Chat & Team List Command (no HTML edit needed) --
+function addToChat(chatObject) {
+    let chatClient = document.getElementById("chatArea");
+    let tmpMessage = document.createElement("div");
+    tmpMessage.className = "chatMessage";
+    tmpMessage.innerHTML = chatObject.msg;
+    chatClient.appendChild(tmpMessage);
+    if (window.navigator.userAgent.indexOf("Edge") > -1) return;
+    chatClient.scrollTo(0, chatClient.scrollHeight);
+}
+
+// Allow showing team list using "team" keyword in chat for convenience
+document.getElementById("chatInput").addEventListener("keydown", (e) => {
+    if (e.keyCode == 13) {
+        if (chatInput.value.trim() == "") {
+            chatInput.value = "";
+        } else if (chatInput.value.trim().toLowerCase() === "team") {
+            // Show employee list in chat area
+            updateEmployeeList();
+            chatInput.value = "";
+        } else {
+            addToChat({msg: chatInput.value.trim()});
+            chatInput.value = "";
+        }
+    }
+});
 
 // -- On Load --
 window.addEventListener("load", () => {
